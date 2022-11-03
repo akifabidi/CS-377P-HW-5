@@ -3,15 +3,24 @@
 #include <stdatomic.h> /* used in other parts of the assignment */
 #include <stdint.h>    /* for uint64  */
 #include <stdio.h>
-#include <stdlib.h>
-#include <time.h> /* for clock_gettime */
+#include <stdint.h> /* for uint64  */
+#include <time.h>   /* for clock_gettime */
+#include <stdatomic.h>   /*used in other parts of the assignment */
+
+#define MAX_THREADS 1
+pthread_t handles[MAX_THREADS];
+int threadArg[MAX_THREADS];
+
+int points;
+double step3;
+double globalSum = 0.0;
 
 double f_part1(double x)
 {
     return (6.0 / sqrt(1 - x * x));
 }
 
-void part1()
+int part1()
 {
 
     double pi = 0.0;
@@ -35,7 +44,7 @@ void part1()
 
     execTime = 1000000000 * (tock.tv_sec - tick.tv_sec) + tock.tv_nsec - tick.tv_nsec;
 
-    printf("elapsed process CPU time = %llu nanoseconds\n", (long long unsigned int)execTime);
+    printf("\n ----PART 1---- \n elapsed process CPU time = %llu nanoseconds\n", (long long unsigned int)execTime);
 
     printf("%.20f\n", pi);
     return 0;
@@ -49,65 +58,97 @@ double f_unit_circle(double x)
     return (sqrt(1 - x * x));
 }
 
-void part2()
+//The top half of this circle can be written analytically as y = sqrt(1-x*x) for x between -0.5 and 0.5. 
+int part2()
 {
+    double pi = 0.0;
     uint64_t execTime; /*time in nanoseconds */
     struct timespec tick, tock;
 
-    double pi = 0.0;
-    int numPoints = 1000000000;
-    double step = 0.5 / numPoints;
+
+    int numPoints = 175;
+    double step = 2.0 / numPoints;
 
     clock_gettime(CLOCK_MONOTONIC_RAW, &tick);
 
-    double x = 0.0;
-    for (int i = -0.5; i < numPoints; i++)
+    double x = -1.0;
+    for (double i = 0; i <  numPoints; i++)
     {
-        pi = pi + step * f(x); // Add to local sum
-        x = x + step;          // next x
+        pi = pi + step * f_unit_circle(x); // Add to local sum
+        x += step;          // next x
     }
-
+    
     clock_gettime(CLOCK_MONOTONIC_RAW, &tock);
 
     execTime = 1000000000 * (tock.tv_sec - tick.tv_sec) + tock.tv_nsec - tick.tv_nsec;
 
-    printf("elapsed process CPU time = %llu nanoseconds\n", (long long unsigned int)execTime);
+    printf("\n ----PART 2---- \n elapsed process CPU time = %llu nanoseconds\n", (long long unsigned int)execTime);
 
     printf("%.20f\n", pi);
     return 0;
 }
 
-void part3()
-{
-    uint64_t execTime; /*time in nanoseconds */
-    struct timespec tick, tock;
+//--------------------------------------------------------------
 
-    double pi = 0.0;
-    int numPoints = 1000000000;
-    double step = 0.5 / numPoints;
+//The top half of this circle can be written analytically as y = sqrt(1-x*x) for x between -0.5 and 0.5. 
+void *part3(void *threadIdPtr) {
+// {
+//     double pi = 0.0;
+//     uint64_t execTime; /*time in nanoseconds */
+//     struct timespec tick, tock;
 
-    clock_gettime(CLOCK_MONOTONIC_RAW, &tick);
+//     int numPoints = 1000000000;
+//     double step = 2.0 / numPoints;
 
-    double x = 0.0;
-    for (int i = -0.5; i < numPoints; i++)
+
+    
+    int myId = *(int*)threadIdPtr;
+    for (int i =myId; i < points; i += MAX_THREADS)
     {
-        pi = pi + step * f(x); // Add to local sum
-        x = x + step;          // next x
+        double x = step3 * ((double)i) - 1;
+        double value =  step3 * f_unit_circle(x); // Add to local sum
+        globalSum = globalSum + value;         // next x
     }
 
-    clock_gettime(CLOCK_MONOTONIC_RAW, &tock);
 
-    execTime = 1000000000 * (tock.tv_sec - tick.tv_sec) + tock.tv_nsec - tick.tv_nsec;
-
-    printf("elapsed process CPU time = %llu nanoseconds\n", (long long unsigned int)execTime);
-
-    printf("%.20f\n", pi);
+   
     return 0;
+    
 }
 
 
 int main(int argc, char *argv[])
 {
-    part1();
-    // part2()
+    //part1();
+    //part2();
+
+
+    uint64_t execTime; /*time in nanoseconds */
+    struct timespec tick, tock;
+    clock_gettime(CLOCK_MONOTONIC_RAW, &tick);
+
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    points = 175;
+    step3 = 2.0 / points;
+    for(int i = 0; i < MAX_THREADS; i++) {
+        threadArg[i] = i;
+        pthread_create(& handles[i], &attr, part3, &threadArg[i]);
+    }
+
+
+    
+    for (int i=0; i< MAX_THREADS; i++) {
+        pthread_join(handles[i], NULL);
+    }
+
+
+    clock_gettime(CLOCK_MONOTONIC_RAW, &tock);
+    execTime = 1000000000 * (tock.tv_sec - tick.tv_sec) + tock.tv_nsec - tick.tv_nsec;
+    printf("\n ----PART 3---- \n elapsed process CPU time = %llu nanoseconds\n", (long long unsigned int)execTime);
+
+
+    printf("thread %d, pi/2 = %.20f\n", MAX_THREADS, globalSum);
+    return 0;
 }
+    
