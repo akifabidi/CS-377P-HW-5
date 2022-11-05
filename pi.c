@@ -7,13 +7,22 @@
 #include <time.h>   /* for clock_gettime */
 #include <stdatomic.h>   /*used in other parts of the assignment */
 
-#define MAX_THREADS 1
+#define MAX_THREADS 4
 pthread_t handles[MAX_THREADS];
 int threadArg[MAX_THREADS];
 
 int points;
 double step3;
 double globalSum = 0.0;
+
+pthread_mutex_t globalSum_lock;
+
+// for part 6
+double sum[MAX_THREADS];
+
+// for part 8
+pthread_barrier_t varBarrier;
+
 
 double f_part1(double x)
 {
@@ -66,7 +75,7 @@ int part2()
     struct timespec tick, tock;
 
 
-    int numPoints = 175;
+    int numPoints = 100;
     double step = 2.0 / numPoints;
 
     clock_gettime(CLOCK_MONOTONIC_RAW, &tick);
@@ -84,7 +93,7 @@ int part2()
 
     printf("\n ----PART 2---- \n elapsed process CPU time = %llu nanoseconds\n", (long long unsigned int)execTime);
 
-    printf("%.20f\n", pi);
+    printf("%.20f\n", pi * 2);
     return 0;
 }
 
@@ -110,12 +119,48 @@ void *part3(void *threadIdPtr) {
         globalSum = globalSum + value;         // next x
     }
 
-
+    pthread_exit(NULL);
    
-    return 0;
     
 }
 
+
+void *part4(void *threadIdPtr) {
+    
+    int myId = *(int*)threadIdPtr;
+    for (int i =myId; i < points; i += MAX_THREADS)
+    {
+        double x = step3 * ((double)i) - 1;
+        double value =  step3 * f_unit_circle(x);
+        pthread_mutex_lock(&globalSum_lock);
+        globalSum = globalSum + value;         
+        pthread_mutex_unlock(&globalSum_lock);
+    }
+    
+    pthread_exit(NULL);
+    
+}
+
+void *part6(void *threadIdPtr) {
+    int myId = *(int *)threadIdPtr;
+    for (int i = myId; i < points; i+=MAX_THREADS) {
+        double x = step3 * ((double) i) - 1; // next x
+        sum[myId] = sum[myId] + step3*f_unit_circle(x); // Add to local sum
+    }
+}
+
+// this is the code for part 7 and 8
+void *part7(void *threadIdPtr) {
+    int myId = *(int *)threadIdPtr;
+    double currSum = 0.0;
+    for (int i = myId; i < points; i+=MAX_THREADS) {
+        double x = step3 * ((double) i) - 1; // next x
+        currSum = currSum + step3*f_unit_circle(x); // Add to local sum
+    }
+    //part 8 code
+    //pthread_barrier_wait (&varBarrier);
+    sum[myId] = currSum;
+}
 
 int main(int argc, char *argv[])
 {
@@ -123,24 +168,43 @@ int main(int argc, char *argv[])
     //part2();
 
 
-    uint64_t execTime; /*time in nanoseconds */
+   uint64_t execTime; /*time in nanoseconds*/
     struct timespec tick, tock;
     clock_gettime(CLOCK_MONOTONIC_RAW, &tick);
 
-    pthread_attr_t attr;
-    pthread_attr_init(&attr);
-    points = 175;
+    points = 100;
     step3 = 2.0 / points;
+    // part 3 code
     for(int i = 0; i < MAX_THREADS; i++) {
+        // part 6 code will include sum[i] = 0;
         threadArg[i] = i;
-        pthread_create(& handles[i], &attr, part3, &threadArg[i]);
+        pthread_create(& handles[i], NULL, part3, &threadArg[i]);
     }
 
+
+    // part 8 code
+    //pthread_barrier_init (&varBarrier,NULL,MAX_THREADS);
+
+
+    // part 4 code 
+    // TODO figure out mutex lock init and where to do
+    /*pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    for(int i = 0; i < MAX_THREADS; i++) {
+        threadArg[i] = i;
+        pthread_create(& handles[i], &attr, part4, &threadArg[i]);
+    }*/
 
     
     for (int i=0; i< MAX_THREADS; i++) {
         pthread_join(handles[i], NULL);
     }
+
+    // part 6 and 7 code
+    /*for (int i=0; i< MAX_THREADS; i++) {
+        pthread_join(handles[i], NULL);
+        pi += sum[i];
+    }*/
 
 
     clock_gettime(CLOCK_MONOTONIC_RAW, &tock);
@@ -148,7 +212,8 @@ int main(int argc, char *argv[])
     printf("\n ----PART 3---- \n elapsed process CPU time = %llu nanoseconds\n", (long long unsigned int)execTime);
 
 
-    printf("thread %d, pi/2 = %.20f\n", MAX_THREADS, globalSum);
-    return 0;
+    printf("thread %d, pi = %.20f\n", MAX_THREADS, globalSum * 2);
+    pthread_exit(NULL);
+    //return 0;
 }
     
