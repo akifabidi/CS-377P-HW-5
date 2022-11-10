@@ -3,7 +3,7 @@
 #include <atomic>
 using namespace std;
 
-#define MAX_THREADS 8
+#define MAX_THREADS 1
 int threadArg[MAX_THREADS];
 pthread_t handles[MAX_THREADS];
 std::atomic<double> pi{0.0};
@@ -45,7 +45,7 @@ int main()
     step3 = 2.0 / points;
     pthread_attr_t attr;
     pthread_attr_init(&attr);
-    clock_gettime(CLOCK_MONOTONIC_RAW, &tick)
+    clock_gettime(CLOCK_MONOTONIC_RAW, &tick);
     for(int i = 0; i < MAX_THREADS; i++) {
         threadArg[i] = i;
         pthread_create(& handles[i], &attr, part5, &threadArg[i]);
